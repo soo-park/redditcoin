@@ -1,3 +1,6 @@
 env/
 *experiement*/
 experiment/
+*secret*.*
+.vscode/
+.sonarlint/
