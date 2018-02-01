@@ -66,7 +66,7 @@ def getNew(subName, folderName):
     subreddit_posts = r.get_submissions(subName,  limit=1000)
 
     for comment in subreddit_comment:
-        print comment
+        print (comment)
         url= "https://reddit.com" + comment.permalink
         data= {'user-agent':'archive by /u/healdb'}
         # anually grabbing this file is faster than loading the individual json

@@ -1,12 +1,13 @@
-CLIENT_ID = os.environ["CLIENT_ID"]
-CLIENT_SECRET = os.environ["CLIENT_SECRET"]
-REDIRECT_URI = "http://localhost:65010/reddit_callback"
-
+import os
 from flask import Flask, abort, request
 from uuid import uuid4
 import requests
 import requests.auth
 import urllib
+
+CLIENT_ID = os.environ["CLIENT_ID"]
+CLIENT_SECRET = os.environ["CLIENT_SECRET"]
+REDIRECT_URI = "http://localhost:65010/reddit_callback"
 
 
 def user_agent():

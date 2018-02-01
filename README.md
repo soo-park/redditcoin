@@ -146,9 +146,9 @@ Flask, React, Bootstrap
 
 ## How to see a test run
 
-
-
-
+server runs on python3
+alias python=python3 will make it work
+also use pip3 install requirements.txt
 
 
 ### Use bash script given
