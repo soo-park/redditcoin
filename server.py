@@ -1,12 +1,13 @@
-CLIENT_ID = os.environ["CLIENT_ID"]
-CLIENT_SECRET = os.environ["CLIENT_SECRET"]
-REDIRECT_URI = "http://localhost:65010/reddit_callback"
-
+import os
 from flask import Flask, abort, request
 from uuid import uuid4
 import requests
 import requests.auth
 import urllib
+
+CLIENT_ID = os.environ["CLIENT_ID"]
+CLIENT_SECRET = os.environ["CLIENT_SECRET"]
+REDIRECT_URI = "http://localhost:65010/reddit_callback"
 
 
 def user_agent():
@@ -41,7 +42,12 @@ def make_authorization_url():
             "redirect_uri": REDIRECT_URI,
             "duration": "temporary",
             "scope": "identity"}
-    url = "https://ssl.reddit.com/api/v1/authorize?" + urllib.urlencode(params)
+
+    # urllib has been split up in Python 3. 
+    # The urllib.urlencode() function is now urllib.parse.urlencode(), 
+    # and the urllib.urlopen() function is now urllib.request.urlopen().
+    # url = "https://ssl.reddit.com/api/v1/authorize?" + urllib.urlencode(params) # python2
+    url = "https://ssl.reddit.com/api/v1/authorize?" + urllib.parse.urlencode(params) #python3
     return url
 
 

@@ -4,3 +4,4 @@ experiment/
 *secret*.*
 .vscode/
 .sonarlint/
+node_modules/
