@@ -42,7 +42,12 @@ def make_authorization_url():
             "redirect_uri": REDIRECT_URI,
             "duration": "temporary",
             "scope": "identity"}
-    url = "https://ssl.reddit.com/api/v1/authorize?" + urllib.urlencode(params)
+
+    # urllib has been split up in Python 3. 
+    # The urllib.urlencode() function is now urllib.parse.urlencode(), 
+    # and the urllib.urlopen() function is now urllib.request.urlopen().
+    # url = "https://ssl.reddit.com/api/v1/authorize?" + urllib.urlencode(params) # python2
+    url = "https://ssl.reddit.com/api/v1/authorize?" + urllib.parse.urlencode(params) #python3
     return url
 
 
