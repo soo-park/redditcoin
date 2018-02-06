@@ -1,14 +1,10 @@
-# Thanks to github subredditarchive repo
-# -*- coding: utf-8 -*-
-import time
-import datetime
+from __future__ import print_function
 import praw
 import os
-import traceback
-import requests
-
-b = "timestamp:"
-d = ".."
+import datetime as dt
+import time
+import csv
+import re
 
 SCR_CLIENT_ID = os.environ["SCR_CLIENT_ID"]
 SCR_CLIENT_SECRET = os.environ["SCR_CLIENT_SECRET"]
@@ -16,156 +12,68 @@ SCR_PASSWORD = os.environ["SCR_PASSWORD"]
 SCR_USERAGENT = os.environ["SCR_USERAGENT"]
 SCR_USERNAME = os.environ["SCR_USERNAME"]
 
-#Config Details
-r = praw.Reddit(client_id = SCR_CLIENT_ID,
+
+class RedditScraper():
+    def __init__(self, subreddit):
+        self.post_list = []
+        self.api = praw.Reddit(client_id = SCR_CLIENT_ID,
                 client_secret = SCR_CLIENT_SECRET, password = SCR_PASSWORD,
                 user_agent = SCR_USERAGENT, username = SCR_USERNAME)
+        self.sr = self.api.subreddit(subreddit)
 
-def resume():
-    if os.path.exists('config.txt'):
-        line = file('config.txt').read()
-        startStamp, endStamp, step, subName=line.split(', ')
-        startStamp, endStamp, step=int(startStamp), int(endStamp), int(step)
-        return startStamp, endStamp, step, subName
-    else:
-        return 0
+    def get_posts_in_date_range(self, start_date, end_date, posts_per_day):
+        """
+        start_date (YYYY-MM-DD)
+        end_date (YYYY-MM-DD)
+        """
+        start_date_ts = time.mktime(dt.datetime.strptime(start_date, '%Y-%m-%d').timetuple())
+        end_date_ts = time.mktime(dt.datetime.strptime(end_date, '%Y-%m-%d').timetuple())
+        loop_ts = start_date_ts
+        while loop_ts <= end_date_ts:
+            self.get_top_posts_from_date(loop_ts, posts_per_day)
+            loop_ts = int(loop_ts + dt.timedelta(days=1).total_seconds())
 
-choice = input('\nMENU\nPlease choose one of the following:\n1. Start New Archive\n2. Continue Archiving\n3. Exit\n(Input the number)\n')
+    def get_top_posts_from_date(self, start_date_ts, posts_per_day):
+        """
+        Get top post of the day
+        """
 
-if choice == 1:
-    subName = raw_input('Input the subreddit to archive: ')
-    sdate = raw_input('Input start date in the format dd/mm/yyyy: ')
-    startStamp = int(time.mktime(datetime.datetime.strptime(sdate,  "%d/%m/%Y").timetuple()))
-    edate = raw_input('Input end date in the format dd/mm/yyyy: ')
-    endStamp = int(time.mktime(datetime.datetime.strptime(edate,  "%d/%m/%Y").timetuple()))
-    step = input('Input seconds between each search,  30 recommended: ')
-    obj = file('config.txt', 'w')
-    obj.write(str(startStamp) + ', ' + str(endStamp) + ', ' + str(step) + ', ' + str(subName))
-    obj.close()
+        end_date_ts = int(start_date_ts + dt.timedelta(days=1).total_seconds())
+        query = 'timestamp:{}..{}'.format(start_date_ts, end_date_ts)
+        results = self.sr.search(query, limit=posts_per_day, params={}, sort='top', syntax='cloudsearch')
+        for result in results:
+            self.post_list.append(result)
 
-elif choice == 2:
-    try:
-        startStamp, endStamp, step, subName=resume()
-    except:
-        print('Nothing to continue.')
-        exit()
-else:
-    exit()
+    def make_csv(self, children):
+        """
+        Generates CSV file from the list of Reddit Submission objects
+        """
 
+        OUTPUT_FILE = '../data/reddit.csv'
+        csv_file_handle = open(OUTPUT_FILE, 'w')
+        out_csv = csv.writer(csv_file_handle, delimiter=',',
+                                quotechar='"', quoting=csv.QUOTE_MINIMAL)
+        out_csv.writerow(['date', 'subreddit', 'title', 'upvotes'])
+        regex = re.compile('[^a-zA-Z1-9\s]')
 
-sdate = datetime.datetime.fromtimestamp(int(startStamp)).strftime('%d-%m-%Y')
-edate = datetime.datetime.fromtimestamp(int(endStamp)).strftime('%d-%m-%Y')
-folderName = str(subName+'_'+str(sdate)+'_'+str(edate))
+        def clean_data(text):
+            intermediate_text = re.sub('\n', '\n', text)
+            return regex.sub('', intermediate_text)
 
-if not os.path.exists(folderName):
-    os.makedirs(folderName)
-
-def getNew(subName, folderName):
-
-    subreddit_comment = r.get_comments(subName,  limit=1000)
-    subreddit_posts = r.get_submissions(subName,  limit=1000)
-
-    for comment in subreddit_comment:
-        print (comment)
-        url= "https://reddit.com" + comment.permalink
-        data= {'user-agent':'archive by /u/healdb'}
-        # anually grabbing this file is faster than loading the individual json
-        response = requests.get(url+'.json', headers=data)
-        # eate a folder called dogecoinArchive before running the script
-        filename=folderName+"/"+comment.name
-        obj=open(filename,  'w')
-        obj.write(response.text)
-        obj.close()
-
-    for post in subreddit_posts:
-        print ("posted is:", post)
-        url1= "https://reddit.com" + post.permalink
-        #pprint(vars(post))
-        data= {'user-agent':'archive by /u/healdb'}
-        #manually grabbing this file is much faster than loading the individual json files of every single comment,  as this json provides all of it
-        if submission.id not in already_done:
-            response = requests.get(url1+'.json', headers=data)
-            #Create a folder called dogecoinArchive before running the script
-            filename=folderName+"/"+post.name
-            obj=open(filename,  'w')
-            obj.write(response.text)
-            obj.close()
-            #print post_json
-            already_done.add(submission.id)
-        else:
-            continue
+        counter = 0
+        for child in children:
+            counter += 1
+            # if (len(children) % 100 == 0):
+            print (str(counter) + " items processed")
+            title = child.title
+            upvotes = child.ups
+            time_from_epoch = child.created_utc
+            date = dt.datetime.utcfromtimestamp(time_from_epoch).strftime('%Y-%m-%d')
+            cleaned_data = clean_data(title)
+            subreddit = child.subreddit
+            out_csv.writerow([date, subreddit, cleaned_data, upvotes])
 
 
-def main(startStamp, endStamp, step, folderName, subName, progress):
-
-    count=step
-
-    try:
-        startStamp = open(folderName + "/lastTimestamp.txt").read()
-        print("Resuming from timestamp: " + startStamp)
-        time.sleep(3)
-        startStamp = int(startStamp)
-        progress = startStamp
-    except:
-        pass
-
-    c = 1
-
-    for currentStamp in range(startStamp, endStamp, step):
-        e = ' --'
-        if(c % 2 == 0):
-            e=' |'
-        f = str(currentStamp)
-        g = str(currentStamp+step)
-        search_results = r.subreddit(subName).search(b+f+d+g,  syntax='cloudsearch')
-        end=str((int((float(count)/float(progress)*20.0))*10)/2) + '%'
-        print(('\n'*1000) + 'Archiving posts and comments...\n[' + '*'*int((float(count) / float(progress) * 20.0)) + '_' * (20 - int(float(count) / float(progress) * 20.0)) + ']' + end + e)
-        count += step
-
-        for post in search_results:
-            #print("---I found a post! It\'s called:" + str(post))
-            url = "https://reddit.com" + (post.permalink).replace('?ref=search_posts', '')
-            #pprint(vars(post))
-            data = {'user-agent':'archive by /u/healdb'}
-            #manually grabbing this file is much faster than loading the individual json files of every single comment,  as this json provides all of it
-            response = requests.get(url+'.json', headers=data)
-            #Create a folder called dogecoinArchive before running the script
-            filename = folderName+"/"+post.name+'.json'
-            obj = open(filename,  'w')
-            obj.write(response.text)
-            obj.close()
-            #print post_json
-            #print("I saved the post and named it " + str(post.name) + " .---")
-            time.sleep(1)
-
-        obj = open(folderName+"/lastTimestamp.txt",  'w')
-        obj.write(str(currentStamp))
-        obj.close()
-        c += 1
-
-    print('Welp,  all done here! Stopped')
-
-progress = endStamp - startStamp
-
-while True:
-    try:
-        main(startStamp, endStamp, step, folderName, subName, progress)
-        print("Succesfully got all posts within parameters.")
-        choice=input('You can now either\n1. Exit\n2. Get new posts\n(Input the number)\n')
-        if(choice == 1):
-            exit()
-        else:
-            while True:
-                getNew(subName, folderName)
-    except KeyboardInterrupt:
-        exit()
-    except SystemExit:
-        exit()
-    except:
-        print("Error in the program! The error was as follows: ")
-        error = traceback.format_exc()
-        time.sleep(5)
-        print(error)
-        time.sleep(5)
-        print("Resuming in 5 seconds...")
-        time.sleep(5)
+rs = RedditScraper('bitcoin')
+rs.get_posts_in_date_range('2007-01-16', '2018-01-30', 1)
+rs.make_csv(rs.post_list)
